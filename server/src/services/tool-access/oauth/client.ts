@@ -2,6 +2,7 @@ import { HttpError, unprocessable } from "../../../errors.js";
 import { asRecord, originOf } from "./metadata.js";
 import { normalizeOAuthProviderError, oauthProviderErrorMessage } from "./provider-errors.js";
 import type { OAuthProviderEndpoints, OAuthTokenEndpointAuthMethod, OAuthTransport } from "./types.js";
+import { oauthClientApplicationType } from "./loopback.js";
 
 const MAX_OAUTH_DCR_CLIENT_ID_LENGTH = 4_096;
 
@@ -188,11 +189,8 @@ export function createOAuthClientProtocol({ fetchRemoteHttpUrl, assertOAuthEndpo
       ],
       response_types: ["code"],
       token_endpoint_auth_method: tokenEndpointAuthMethod,
-      // RFC 7591: Paperclip's callback is a server-side HTTPS endpoint, so this
-      // is a `web` client, not a `native` one. Some authorization servers reject
-      // an https redirect URI when the default (`web`) is left implicit, and
-      // others apply native-client redirect rules without it.
-      application_type: "web",
+      // Local HTTP callbacks use native-client loopback rules; HTTPS remains web.
+      application_type: oauthClientApplicationType(input.redirectUri),
     };
     const response = await fetchRemoteHttpUrl(
       assertOAuthEndpointUrl("registration", input.endpoints.registrationUrl),

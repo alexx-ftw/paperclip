@@ -1,4 +1,5 @@
 import { assertPublicRemoteHttpEndpoint, type RemoteHttpEndpointLookup } from "../../remote-http-endpoint-guard.js";
+import { isOAuthLoopbackHostname, oauthClientApplicationType } from "./loopback.js";
 
 /**
  * Where this deployment publishes its Client ID Metadata Document. The document's
@@ -26,13 +27,7 @@ export async function resolveOAuthClientIdMetadataDocumentUrl(
   try {
     const parsed = new URL(redirectUri);
     if (parsed.protocol !== "https:") return null;
-    const hostname = parsed.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-    const isLoopback =
-      hostname === "localhost" ||
-      hostname.endsWith(".localhost") ||
-      hostname === "::1" ||
-      /^127(?:\.\d{1,3}){3}$/.test(hostname);
-    if (isLoopback) return null;
+    if (isOAuthLoopbackHostname(parsed.hostname)) return null;
     const metadataUrl = new URL(
       OAUTH_CLIENT_ID_METADATA_DOCUMENT_PATH,
       parsed.origin,
@@ -75,6 +70,6 @@ export function oauthClientIdMetadataDocument(input: {
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
     token_endpoint_auth_method: "none",
-    application_type: "web",
+    application_type: oauthClientApplicationType(input.redirectUri),
   };
 }

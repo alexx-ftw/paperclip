@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { toolConnections } from "@paperclipai/db";
 import type { AppDefinition } from "@paperclipai/shared";
 import { badRequest, unprocessable } from "../../../errors.js";
+import { isOAuthLoopbackHostname } from "./loopback.js";
 
 export function assertOAuthRedirectConstraints(
   app: AppDefinition | null,
@@ -18,15 +19,9 @@ export function assertOAuthRedirectConstraints(
       code: "oauth_redirect_uri_invalid",
     });
   }
-  const hostname = redirect.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  const isLoopback =
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "::1" ||
-    /^127(?:\.\d{1,3}){3}$/.test(hostname);
   if (
     redirect.protocol === "https:" ||
-    (redirect.protocol === "http:" && isLoopback)
+    (redirect.protocol === "http:" && isOAuthLoopbackHostname(redirect.hostname))
   )
     return;
   throw unprocessable(

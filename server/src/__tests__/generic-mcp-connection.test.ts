@@ -1229,6 +1229,34 @@ describeEmbeddedPostgres("generic remote MCP connections", () => {
     await expect(db.select().from(companySecrets)).resolves.toHaveLength(0);
   });
 
+  it("registers loopback OAuth callbacks as native clients", async () => {
+    const fixture = installMcpOAuthFixture({ auth: "oauth" });
+    const company = await createCompany(db);
+    const service = toolAccessService(db);
+    const connected = await service.connectGalleryApp(company.id, { link: MCP_URL, name: "Fixture local OAuth" });
+
+    const redirectUri = "http://localhost:3100/api/tools/oauth/callback";
+    const actor = { actorType: "user" as const, actorId: "board-user" };
+    const start = await service.startOAuth(company.id, connected.connectionId, { redirectUri, actor });
+
+    expect(fixture.requestsTo("/register")).toHaveLength(1);
+    expect(fixture.requestsTo("/register")[0]!.body).toMatchObject({
+      redirect_uris: [redirectUri],
+      application_type: "native",
+      token_endpoint_auth_method: "none",
+    });
+    const authorization = new URL(start.authorizationUrl);
+    const completed = await service.completeOAuthCallback({
+      state: authorization.searchParams.get("state")!,
+      code: fixture.issueAuthorizationCode(start.authorizationUrl),
+      iss: ISSUER,
+      redirectUri,
+      actor,
+    });
+    expect(completed.connection.status).toBe("active");
+    expect((fixture.requestsTo("/token").at(-1)!.body as URLSearchParams).get("code_verifier")).toBeTruthy();
+  });
+
   it("registers dynamically for an unknown OAuth endpoint and completes the flow", async () => {
     const fixture = installMcpOAuthFixture({ auth: "oauth" });
     const company = await createCompany(db);
